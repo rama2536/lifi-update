@@ -1,73 +1,86 @@
-#define DO_PIN   4
-#define BIT_TIME 200   
-#define POLAR    1      
+#define RX_PIN 4
+#define BIT_TIME 500
 
-bool bacaLED() {
-  bool raw = digitalRead(DO_PIN);
-  return (POLAR == 1) ? raw : !raw;  
+bool bacaSensor() {
+
+  return digitalRead(RX_PIN);
 }
 
-char terimaChar() {
-  delay(BIT_TIME + (BIT_TIME / 2));
+bool detectStart() {
 
-  char c = 0;
+  if (bacaSensor() == LOW) {
+
+    unsigned long t0 = millis();
+
+    while (bacaSensor() == LOW) {
+
+      if (millis() - t0 >= (BIT_TIME * 2)) {
+
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+char bacaChar() {
+
+  char data = 0;
+
+  String binaryRX = "";
+
+  while (!detectStart());
+
+  Serial.println("START DETECTED");
+
+  // menuju tengah bit pertama
+  delay(BIT_TIME / 2);
+
   for (int i = 0; i < 8; i++) {
-    if (bacaLED())
-      c |= (1 << i);
+
+    bool level = bacaSensor();
+
+    bool bitData;
+
+    // =================================
+    // HIGH = LED ON  = bit 1
+    // LOW  = LED OFF = bit 0
+    // =================================
+
+    if (level == HIGH) {
+      bitData = 1;
+    }
+    else {
+      bitData = 0;
+    }
+
+    binaryRX += String(bitData);
+
+    data |= (bitData << i);
+
     delay(BIT_TIME);
   }
 
-  delay(BIT_TIME);
-  return c;
+  Serial.print("BINARY RX : ");
+  Serial.println(binaryRX);
+
+  return data;
 }
 
 void setup() {
-  pinMode(DO_PIN, INPUT);
-  Serial.begin(9600);
-  Serial.println("========================");
-  Serial.println("  LiFi RX Siap");
-  Serial.println("  BIT_TIME  : 1000 ms");
-  Serial.print  ("  Polaritas : POLAR=");
-  Serial.println(POLAR);
-  Serial.println("  Menunggu data...");
-  Serial.println("========================");
 
-  while (false) {
-    Serial.print("DO raw=");
-    Serial.print(digitalRead(DO_PIN));
-    Serial.print("  bacaLED=");
-    Serial.println(bacaLED());
-    delay(300);
-  }
+  pinMode(RX_PIN, INPUT_PULLUP);
+
+  Serial.begin(115200);
+
+  Serial.println("RX READY");
 }
 
-String pesanDiterima = "";
-int    totalError     = 0;
-
 void loop() {
-  if (!bacaLED()) return;  
 
-  Serial.println("[RX] Menerima karakter...");
-  char c = terimaChar();
+  char c = bacaChar();
 
-  if (c == '\n') {
-    Serial.println();
-    Serial.println("========================");
-    Serial.print("[RX] Pesan   : ");  Serial.println(pesanDiterima);
-    Serial.print("[RX] Panjang : ");  Serial.print(pesanDiterima.length());
-    Serial.println(" karakter");
-    Serial.print("[RX] Error   : ");  Serial.println(totalError);
-    Serial.println(digitalRead(DO_PIN));
-    Serial.println("========================");
-    pesanDiterima = "";
-    totalError    = 0;
-
-  } else if (c >= 32 && c <= 126) {
-    pesanDiterima += c;
-    Serial.print("[RX] Karakter : ");  Serial.println(c);
-
-  } else {
-    totalError++;
-    Serial.print("[ERR] byte = ");  Serial.println((int)c);
-  }
+  Serial.print("HASIL RX : ");
+  Serial.println(c);
 }
