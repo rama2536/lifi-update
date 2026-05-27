@@ -1,57 +1,102 @@
-#define LED_PIN  3
-#define BIT_TIME 200   
+#define PWM_PIN 3
+#define BIT_TIME 500
 
-void kirimBit(bool bit) {
-  digitalWrite(LED_PIN, bit ? HIGH : LOW);
+// ACTIVE LOW DRIVER
+// LOW  = LED ON
+// HIGH = LED OFF
+
+void ledOn() {
+  digitalWrite(PWM_PIN, LOW);
+}
+
+void ledOff() {
+  digitalWrite(PWM_PIN, HIGH);
+}
+
+void kirimBit(bool bitData) {
+
+  // =================================
+  // BIT 1 = LED ON
+  // BIT 0 = LED OFF
+  // =================================
+
+  if (bitData == 1) {
+    ledOn();
+  }
+  else {
+    ledOff();
+  }
+
   delay(BIT_TIME);
-  Serial.print("data= ");
-  Serial.print(bit);
-  Serial.println("end");
 }
 
 void kirimChar(char c) {
-  kirimBit(1);
-  for (int i = 0; i < 8; i++)
-    kirimBit((c >> i) & 1);
-  kirimBit(0);
-  delay(BIT_TIME);
-}
 
-void kirimPesan(String pesan) {
-  Serial.print("[TX] Mengirim  : ");  Serial.println(pesan);
-  Serial.print("[TX] Estimasi  : ");
-  Serial.print(pesan.length() * 10);
-  Serial.println(" detik");
+  Serial.print("KIRIM CHAR : ");
+  Serial.println(c);
 
-  for (int i = 0; i < (int)pesan.length(); i++) {
-    kirimChar(pesan[i]);
-    Serial.print("[TX] Karakter ke-"); Serial.print(i + 1);
-    Serial.print(" : ");               Serial.println(pesan[i]);
+  // =================================
+  // PREAMBLE
+  // =================================
+
+  for (int i = 0; i < 6; i++) {
+
+    ledOff();
+    delay(100);
+
+    ledOn();
+    delay(100);
   }
 
-  kirimChar('\n');
-  Serial.println("[TX] Selesai!");
+  // =================================
+  // START
+  // OFF panjang
+  // =================================
+
+  ledOff();
+
+  delay(BIT_TIME * 2);
+
+  // =================================
+  // DATA
+  // =================================
+
+  Serial.print("BINARY TX : ");
+
+  for (int i = 0; i < 8; i++) {
+
+    bool bitData = (c >> i) & 1;
+
+    Serial.print(bitData);
+
+    kirimBit(bitData);
+  }
+
+  Serial.println();
+
+  // kembali idle
+  ledOn();
 }
 
 void setup() {
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);
+
+  pinMode(PWM_PIN, OUTPUT);
+
+  ledOn();
+
   Serial.begin(9600);
-  Serial.println("========================");
-  Serial.println("  LiFi TX Siap");
-  Serial.println("  BIT_TIME  : 1000 ms");
-  Serial.println("  Idle      : LED mati");
-  Serial.println("========================");
-  Serial.println("Ketik pesan + Enter");
+
+  Serial.println("TX READY");
 }
 
 void loop() {
-  // digitalWrite(LED_PIN, LOW);
-  analogWrite(LED_PIN, 0);
-  if (!Serial.available()) return;
 
-  String pesan = Serial.readStringUntil('\n');
-  pesan.trim();
-  if (pesan.length() > 0)
-    kirimPesan(pesan);
+  if (Serial.available()) {
+
+    char c = Serial.read();
+
+    if (c == '\n' || c == '\r') return;
+
+    kirimChar(c);
+  }
 }
